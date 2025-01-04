@@ -64,6 +64,9 @@ const Profile = ({ navigation }: any) => {
           if (value !== null) {
             // We got the value from AsyncStorage
             console.log('Is Google Sign-In:', JSON.parse(value));
+
+
+            
           }
         } catch (error) {
           console.error('Error retrieving Google sign-in status:', error);

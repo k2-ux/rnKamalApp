@@ -76,9 +76,9 @@ const handleGoogle = async()=>{
       );
 
       // Update the user's profile with a display name
-      await userCredential.user.updateProfile({
+     await userCredential.user.updateProfile({
         displayName: name,
-      });
+      } );
 
       console.log('User profile updated with display name:', name);
 

@@ -12,6 +12,7 @@ import { RootState } from '../redux/store';
 import { useDispatch, useSelector } from 'react-redux';
 import {addFavorite,removeFavorite} from '../redux/favouriteSlice'
 import Images from '../helpers/Images';
+import Constants from '../helpers/constants';
 interface Product {
   id:string;
   title: string;
@@ -29,7 +30,7 @@ const Listing = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await fetch('https://dummyjson.com/products');
+        const response = await fetch(Constants.API_URL)
         const data = await response.json();
         setProducts(data.products);
       } catch (error) {
