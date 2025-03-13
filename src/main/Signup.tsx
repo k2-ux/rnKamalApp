@@ -12,31 +12,40 @@ import {
   Platform,
 } from 'react-native';
 import Images from '../helpers/Images';
-import {GoogleSignin,isErrorWithCode,isSuccessResponse,statusCodes} from '@react-native-google-signin/google-signin';
+import {
+  GoogleSignin,
+  isErrorWithCode,
+  isSuccessResponse,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from '../helpers/Constants';
 
 const Signup = ({navigation}: any) => {
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string>('');
-  const [usrInfo, setUsrInfo]= useState(null)
+  const [usrInfo, setUsrInfo] = useState(null);
   useEffect(() => {
     GoogleSignin.configure({
-      webClientId:
-        '150246811251-7ucgh4rufut99t5qpjub0p07gff89m4j.apps.googleusercontent.com',
+      webClientId: Constants.Google_WebClient_Id,
     });
   }, []);
-const handleGoogle = async()=>{
+  const handleGoogle = async () => {
     try {
       await GoogleSignin.hasPlayServices();
+      await GoogleSignin.signOut();
       const response = await GoogleSignin.signIn();
-      console.log(response)
+      console.log(response);
 
       if (isSuccessResponse(response)) {
-        await AsyncStorage.setItem('isGoogleSign', JSON.stringify("true"));
-        await AsyncStorage.setItem('googleUser', JSON.stringify(response.data.user));
-        navigation.navigate('Home')
+        await AsyncStorage.setItem('isGoogleSign', JSON.stringify('true'));
+        await AsyncStorage.setItem(
+          'googleUser',
+          JSON.stringify(response.data.user),
+        );
+        navigation.navigate('Home');
       } else {
         // sign in was cancelled by user
       }
@@ -56,7 +65,7 @@ const handleGoogle = async()=>{
         // an error that's not related to google sign in occurred
       }
     }
-}
+  };
   const handleSignup = async () => {
     // Basic validation
     if (!email || !password) {
@@ -158,7 +167,8 @@ const handleGoogle = async()=>{
             Or
           </Text>
 
-          <TouchableOpacity   onPress={handleGoogle}
+          <TouchableOpacity
+            onPress={handleGoogle}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
