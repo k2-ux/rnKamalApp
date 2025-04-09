@@ -117,74 +117,56 @@ const Signup = ({navigation}: any) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Sign Up</Text>
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      <TextInput
-        style={styles.input}
-        placeholder="Name"
-        placeholderTextColor="#aaa"
-        value={name}
-        onChangeText={setName}
-        autoCapitalize="none"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        placeholderTextColor="#aaa"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor="#aaa"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-      <TouchableOpacity style={styles.button} onPress={handleSignup}>
-        <Text style={styles.buttonText}>Sign Up</Text>
-      </TouchableOpacity>
+      <View style={styles.card}>
+        <Text style={styles.title}>Create Account</Text>
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      {/* Login navigation link */}
-      <TouchableOpacity
-        onPress={handleNavigateToLogin}
-        style={styles.loginLink}>
-        <Text style={styles.loginText}>Already have an account? Log in</Text>
-      </TouchableOpacity>
+        <TextInput
+          style={styles.input}
+          placeholder="Full Name"
+          placeholderTextColor="#aaa"
+          value={name}
+          onChangeText={setName}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          placeholderTextColor="#aaa"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor="#aaa"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
 
-      {Platform.OS === 'android' && (
-        <View style={{marginTop: 20}}>
-          <Text
-            style={{
-              color: 'black',
-              fontSize: 16,
-              fontWeight: '600',
-              textAlign: 'center',
-            }}>
-            Or
-          </Text>
+        <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
+          <Text style={styles.signupButtonText}>Sign Up</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleGoogle}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 10,
-              backgroundColor: 'white',
-              padding: 5,
-              borderRadius: 5,
-              marginTop: 10,
-            }}>
-            <Text style={{color: 'black', fontSize: 16, fontWeight: '600'}}>
-              Sign up with
-            </Text>
-            <Image source={Images.google} style={{height: 20, width: 20}} />
-          </TouchableOpacity>
-        </View>
-      )}
+        <TouchableOpacity
+          onPress={handleNavigateToLogin}
+          style={styles.loginLink}>
+          <Text style={styles.loginText}>Already have an account? Log in</Text>
+        </TouchableOpacity>
+
+        {Platform.OS === 'android' && (
+          <View style={styles.googleContainer}>
+            <Text style={styles.orText}>Or sign up with</Text>
+            <TouchableOpacity
+              onPress={handleGoogle}
+              style={styles.googleButton}>
+              <Image source={Images.google} style={styles.googleIcon} />
+              <Text style={styles.googleText}>Continue with Google</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     </View>
   );
 };
@@ -194,53 +176,97 @@ export default Signup;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E5E4E2',
+    backgroundColor: '#EEF2F3',
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+  },
+  card: {
+    backgroundColor: '#ffffffcc',
+    borderRadius: 20,
+    padding: 25,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 10},
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#2c3e50',
     marginBottom: 20,
-    color: '#333',
+    textAlign: 'center',
   },
   input: {
-    backgroundColor: 'white',
-    width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 15,
     height: 50,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    marginVertical: 10,
     fontSize: 16,
-    color: '#000',
+    borderColor: '#ddd',
+    borderWidth: 1,
+    marginBottom: 15,
   },
-  button: {
-    width: '100%',
-    height: 50,
+  signupButton: {
     backgroundColor: '#4CAF50',
-    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
-    borderRadius: 5,
-    marginTop: 20,
+    marginTop: 10,
+    shadowColor: '#4CAF50',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  buttonText: {
+  signupButtonText: {
     color: '#fff',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   errorText: {
-    color: 'red',
+    color: '#e53935',
+    fontSize: 14,
+    textAlign: 'center',
     marginBottom: 10,
   },
   loginLink: {
-    marginTop: 20,
+    marginTop: 15,
+    alignItems: 'center',
   },
   loginText: {
     color: '#4CAF50',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
+  },
+  googleContainer: {
+    marginTop: 30,
+    alignItems: 'center',
+  },
+  orText: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 10,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    elevation: 2,
+  },
+  googleIcon: {
+    height: 20,
+    width: 20,
+    marginRight: 10,
+  },
+  googleText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
   },
 });
