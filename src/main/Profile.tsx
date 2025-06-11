@@ -11,10 +11,13 @@ import {
   ToastAndroid,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
+import {GoogleSignin} from '@react-native-google-signin/google-signin';
 import {clearFavorites} from '../redux/favouriteSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useDispatch} from 'react-redux';
-const API_URL: string = 'https://randomuser.me/api/';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+
+const API_URL = 'https://randomuser.me/api/';
 const avatars = [
   'https://randomuser.me/api/portraits/men/1.jpg',
   'https://randomuser.me/api/portraits/women/1.jpg',
@@ -24,173 +27,195 @@ const avatars = [
   'https://randomuser.me/api/portraits/women/3.jpg',
 ];
 
-const Profile = ({navigation}: any) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [newName, setNewName] = useState<string>('');
-  const [email, setEmail] = useState<string>('');
+type RootStackParamList = {
+  Signup: undefined;
+  Home: undefined;
+};
 
+type ProfileProps = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Signup'>;
+};
+
+// Utility to show readable date
+export function checkDate(dateString: string): string {
+  if (!dateString || !/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+    return 'Invalid Date';
+  }
+  const [day, month, year] = dateString.split('/').map(Number);
+  const inputDate = new Date(year, month - 1, day);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  if (inputDate.getTime() === today.getTime()) return 'Today';
+  if (inputDate.getTime() === yesterday.getTime()) return 'Yesterday';
+  return dateString;
+}
+
+const Profile: React.FC<ProfileProps> = ({navigation}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [email, setEmail] = useState('');
   const [newAvatar, setNewAvatar] = useState('');
-  const [loading, setLoading] = useState<boolean>(true);
+  const [lastLogin, setLastLogin] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const dispatch = useDispatch();
 
   useEffect(() => {
-    const fetchUser = async () => {
+    const initializeUser = async () => {
       try {
-        const response = await fetch('https://randomuser.me/api/');
+        const storedLastLogin = await AsyncStorage.getItem('lastLogin');
+        if (storedLastLogin) setLastLogin(storedLastLogin);
+
+        const response = await fetch(API_URL);
         const data = await response.json();
         const randomUser = data.results[0];
         setNewAvatar(randomUser.picture.large);
-        //   setUser({
-        //     name: `${randomUser.name.first} ${randomUser.name.last}`,
-        //     email: randomUser.email,
-        //     avatar: randomUser.picture.large,
-        //   });
+
+        const isGoogleSign = await AsyncStorage.getItem('isGoogleSign');
+        if (isGoogleSign) {
+          console.log('Is Google Sign-In:', JSON.parse(isGoogleSign));
+        }
+
+        const unsubscribe = auth().onAuthStateChanged(user => {
+          if (user) {
+            setNewName(user.displayName || '');
+            setEmail(user.email || '');
+
+            const currentDate = new Date();
+            const formattedDate = `${String(currentDate.getDate()).padStart(
+              2,
+              '0',
+            )}/${String(currentDate.getMonth() + 1).padStart(
+              2,
+              '0',
+            )}/${currentDate.getFullYear()}`;
+            AsyncStorage.setItem('lastLogin', formattedDate);
+            setLastLogin(formattedDate);
+          } else {
+            console.log('No user is signed in.');
+          }
+        });
+
+        return () => unsubscribe();
       } catch (error) {
-        console.error('Error fetching user data:', error);
+        console.error('Error initializing user:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchUser();
+    initializeUser();
   }, []);
+
   const handleFetchUser = async () => {
-    setLoading(true); // Start loading
+    setLoading(true);
     try {
       const response = await fetch(API_URL);
       const data = await response.json();
       const randomUser = data.results[0];
-
-      setNewAvatar(randomUser.picture.large); // Set the new avatar
+      setNewAvatar(randomUser.picture.large);
     } catch (error) {
       console.error('Error fetching user data:', error);
+      ToastAndroid.show('Failed to fetch avatar', ToastAndroid.SHORT);
     } finally {
-      setLoading(false); // Stop loading
+      setLoading(false);
     }
   };
-  const getGoogleSignStatus = async () => {
-    try {
-      const value = await AsyncStorage.getItem('isGoogleSign');
-      if (value !== null) {
-        // We got the value from AsyncStorage
-        console.log('Is Google Sign-In:', JSON.parse(value));
-      }
-    } catch (error) {
-      console.error('Error retrieving Google sign-in status:', error);
-    }
-  };
-  useEffect(() => {
-    getGoogleSignStatus();
-    const unsubscribe = auth().onAuthStateChanged(user => {
-      if (user) {
-        console.log('User Details:', user);
-        setNewName(user.displayName || ''); // Set default name if null
-        setEmail(user.email || '');
-      } else {
-        console.log('No user is signed in.');
-      }
-    });
 
-    // Cleanup listener on component unmount
-    return () => unsubscribe();
-  }, []);
-
-  const handleEdit = () => {
-    setIsEditing(true);
-  };
-
-  const handleLogout = () => {
-    auth()
-      .signOut()
-      .then(async () => {
-        // Clear AsyncStorage
-        try {
-          await AsyncStorage.clear();
-          console.log('AsyncStorage cleared!');
-        } catch (error) {
-          console.error('Error clearing AsyncStorage:', error);
-        }
-
-        // Clear Redux state
-        dispatch(clearFavorites());
-        console.log('Redux and Favorites state cleared!');
-
-        // Show logout toast
-        ToastAndroid.show('Logging out...', ToastAndroid.SHORT);
-
-        // Navigate to Signup screen
-        navigation.push('Signup');
-      })
-      .catch(error => {
-        console.error('Error signing out:', error);
-        ToastAndroid.show(
-          'Logout failed. Please try again.',
-          ToastAndroid.SHORT,
-        );
-      });
-  };
+  const handleEdit = () => setIsEditing(true);
 
   const handleSave = async () => {
     try {
-      const currentUser = auth().currentUser; // Get the currently signed-in user
-
+      const currentUser = auth().currentUser;
       if (currentUser) {
-        await currentUser.updateProfile({
-          displayName: newName,
-        });
-
-        console.log('Profile updated successfully!');
+        await currentUser.updateProfile({displayName: newName});
+        ToastAndroid.show('Profile updated!', ToastAndroid.SHORT);
         setIsEditing(false);
       } else {
-        console.log('No user is signed in.');
+        ToastAndroid.show('No user signed in', ToastAndroid.SHORT);
       }
     } catch (error) {
       console.error('Error updating profile:', error);
+      ToastAndroid.show('Failed to update profile', ToastAndroid.SHORT);
+    }
+  };
+
+  const handleLogout = async () => {
+    setLogoutLoading(true);
+    try {
+      const isGoogleSign = await AsyncStorage.getItem('isGoogleSign');
+      const isGoogleUser = JSON.parse(isGoogleSign || 'false');
+
+      if (isGoogleUser) {
+        await GoogleSignin.signOut();
+        console.log('Google Sign-Out successful');
+      }
+
+      if (auth().currentUser) {
+        await auth().signOut();
+        console.log('Firebase Sign-Out successful');
+      } else {
+        console.log('No Firebase user signed in');
+      }
+
+      await AsyncStorage.clear();
+      console.log('AsyncStorage cleared');
+
+      dispatch(clearFavorites());
+      console.log('Redux favorites cleared');
+
+      ToastAndroid.show('Logged out successfully', ToastAndroid.SHORT);
+      navigation.replace('Signup');
+    } catch (error) {
+      console.error('Logout Error:', error);
+      ToastAndroid.show('Logout failed. Please try again.', ToastAndroid.SHORT);
+    } finally {
+      setLogoutLoading(false);
     }
   };
 
   const shuffleAvatar = () => {
-    const nextIndex = (avatars.indexOf(newAvatar) + 1) % avatars.length; // Get the next avatar in the array
+    const nextIndex = (avatars.indexOf(newAvatar) + 1) % avatars.length;
     setNewAvatar(avatars[nextIndex]);
   };
 
   return (
     <View style={styles.container}>
-      {newAvatar && <Image source={{uri: newAvatar}} style={styles.avatar} />}
-
       {loading ? (
         <ActivityIndicator size="large" color="#0000ff" />
       ) : (
-        <Button title="Fetch New Avatar" onPress={handleFetchUser} />
-      )}
-      <View style={{marginVertical: 10}} />
-      {newName && (
         <>
-          {/* <Image source={{ uri: newAvatar }} style={styles.avatar} /> */}
-
-          {isEditing ? (
-            <TextInput
-              style={styles.input}
-              value={newName}
-              onChangeText={setNewName}
-              placeholder="Enter new name"
-              color="black"
-            />
-          ) : (
-            <Text style={styles.name}>{newName}</Text>
+          {newAvatar && (
+            <Image source={{uri: newAvatar}} style={styles.avatar} />
+          )}
+          <Text style={styles.name}>{newName || 'Unknown'}</Text>
+          <Text style={styles.email}>{email || 'No email'}</Text>
+          {lastLogin && (
+            <Text style={styles.lastLogin}>
+              Last Login: {checkDate(lastLogin)}
+            </Text>
           )}
 
-          {/* 
-          <TouchableOpacity onPress={shuffleAvatar}>
-            <Text style={styles.editText}>Shuffle Avatar</Text>
-          </TouchableOpacity> */}
-
-          {/* <Button title="Logout" onPress={handleLogout} /> */}
-
           {isEditing ? (
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-              <Button title="Save Changes" onPress={handleSave} />
-              <Button title="Cancel" onPress={() => setIsEditing(false)} />
+            <View style={styles.buttonRow}>
+              <TextInput
+                style={styles.input}
+                value={newName}
+                onChangeText={setNewName}
+                placeholder="Enter new name"
+                placeholderTextColor="#888"
+              />
+              <Button title="Save" onPress={handleSave} disabled={loading} />
+              <Button
+                title="Cancel"
+                onPress={() => setIsEditing(false)}
+                disabled={loading}
+              />
             </View>
           ) : (
             <TouchableOpacity onPress={handleEdit}>
@@ -198,10 +223,23 @@ const Profile = ({navigation}: any) => {
             </TouchableOpacity>
           )}
 
-          <Text style={styles.email}>{email}</Text>
+          <TouchableOpacity onPress={shuffleAvatar}>
+            <Text style={styles.editText}>Shuffle Avatar</Text>
+          </TouchableOpacity>
 
-          <View style={{marginTop: 20}}>
-            <Button title="Logout" onPress={handleLogout} />
+          <Button
+            title="Fetch New Avatar"
+            onPress={handleFetchUser}
+            disabled={loading}
+          />
+
+          <View style={styles.logoutButton}>
+            <Button
+              title={logoutLoading ? 'Logging Out...' : 'Logout'}
+              onPress={handleLogout}
+              disabled={logoutLoading}
+              color="#ff4444"
+            />
           </View>
         </>
       )}
@@ -215,12 +253,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: '#f5f5f5',
   },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
     marginBottom: 20,
+    backgroundColor: '#ccc',
   },
   name: {
     fontSize: 20,
@@ -231,7 +271,12 @@ const styles = StyleSheet.create({
   email: {
     fontSize: 16,
     color: 'black',
-    marginBottom: 30,
+    marginBottom: 10,
+  },
+  lastLogin: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
   },
   editText: {
     color: 'blue',
@@ -243,8 +288,20 @@ const styles = StyleSheet.create({
     height: 40,
     borderColor: 'gray',
     borderWidth: 1,
-    marginBottom: 20,
+    marginBottom: 10,
     paddingLeft: 10,
+    borderRadius: 5,
+    color: 'black',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  logoutButton: {
+    marginTop: 20,
+    width: '80%',
   },
 });
 

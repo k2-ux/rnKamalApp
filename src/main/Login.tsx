@@ -1,70 +1,161 @@
-import React, { useState } from 'react';
-import auth from '@react-native-firebase/auth';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
   TextInput,
   StyleSheet,
   TouchableOpacity,
-  Alert,
+  Platform,
+  ActivityIndicator,
   ToastAndroid,
   Image,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import auth from '@react-native-firebase/auth';
+import {
+  GoogleSignin,
+  User,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Images from '../helpers/Images';
+import Constants from '../helpers/Constants';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {RootStackParamList} from '../types/navigation'; // define this properly in your project
 
-const Login = ({ navigation }: any) => {
+type LoginScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'Login'
+>;
+
+type Props = {
+  navigation: LoginScreenNavigationProp;
+};
+
+// Utility function
+export function checkDate(dateString: string): string {
+  if (!dateString || !/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+    return 'Invalid Date';
+  }
+
+  const [day, month, year] = dateString.split('/').map(Number);
+  const inputDate = new Date(year, month - 1, day);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  if (inputDate.getTime() === today.getTime()) {
+    return 'Today';
+  } else if (inputDate.getTime() === yesterday.getTime()) {
+    return 'Yesterday';
+  } else {
+    return dateString;
+  }
+}
+
+const Login: React.FC<Props> = ({navigation}) => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const handleLogin =async () => {
-    // Basic validation
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: Constants.Google_WebClient_Id,
+    });
+  }, []);
+
+  const storeLoginDate = async (): Promise<void> => {
+    const currentDate = new Date();
+    const formattedDate = `${String(currentDate.getDate()).padStart(
+      2,
+      '0',
+    )}/${String(currentDate.getMonth() + 1).padStart(
+      2,
+      '0',
+    )}/${currentDate.getFullYear()}`;
+    await AsyncStorage.setItem('lastLogin', formattedDate);
+  };
+
+ const handleGoogle = async (): Promise<void> => {
+  setLoading(true);
+  try {
+    await GoogleSignin.hasPlayServices();
+    await GoogleSignin.signOut();
+    const response = await GoogleSignin.signIn();
+
+    await AsyncStorage.setItem('isGoogleSign', JSON.stringify(true));
+    await AsyncStorage.setItem('googleUser', JSON.stringify((response as any).user));
+    await storeLoginDate();
+    ToastAndroid.show('Google Login Successful!', ToastAndroid.SHORT);
+    navigation.navigate('Home');
+  } catch (error: any) {
+    let errorMessage = 'Google Login Failed';
+    if (error.code) {
+      switch (error.code) {
+        case statusCodes.IN_PROGRESS:
+          errorMessage = 'Sign-in in progress';
+          break;
+        case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+          errorMessage = 'Play Services not available';
+          break;
+        default:
+          errorMessage = 'Google Sign-In error';
+      }
+    }
+    ToastAndroid.show(errorMessage, ToastAndroid.SHORT);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+  const handleLogin = async (): Promise<void> => {
     if (!email || !password) {
       setError('Both fields are required');
       return;
     }
+
     if (!/\S+@\S+\.\S+/.test(email)) {
       setError('Invalid email format');
       return;
     }
-    setError('');
-    try {
-      // Attempt to sign in the user
-      await auth().signInWithEmailAndPassword(email, password);
-  
-      // Show a toast message for successful login
-      ToastAndroid.show('Login Successful!', ToastAndroid.SHORT);
-  
-      // Navigate to the Home screen
-      navigation.navigate('Home');
-    } catch (error:any) {
-      // Handle specific error cases
 
-      console.log(error.code, error.message)
+    setError('');
+    setLoading(true);
+    try {
+      await auth().signInWithEmailAndPassword(email, password);
+      await storeLoginDate();
+      ToastAndroid.show('Login Successful!', ToastAndroid.SHORT);
+      navigation.navigate('Home');
+    } catch (error: any) {
+      let errorMessage = 'Login failed';
       if (error.code === 'auth/invalid-credential') {
-        console.log('That email address is invalid!');
-        ToastAndroid.show('Invalid credentials!', ToastAndroid.SHORT);
+        errorMessage = 'Invalid credentials';
       } else if (error.code === 'auth/user-not-found') {
-        console.log('No user found for that email.');
-        ToastAndroid.show('User not found!', ToastAndroid.SHORT);
+        errorMessage = 'User not found';
       } else if (error.code === 'auth/wrong-password') {
-        console.log('Incorrect password.');
-        ToastAndroid.show('Incorrect password!', ToastAndroid.SHORT);
-      } else {
-        // console.error('Error during login:', error);
-        ToastAndroid.show('Login failed!', ToastAndroid.SHORT);
+        errorMessage = 'Incorrect password';
       }
+      ToastAndroid.show(errorMessage, ToastAndroid.SHORT);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleNavigateToSignup = () => {
-    navigation.navigate('Signup'); // Adjust to your signup screen name
+  const handleNavigateToSignup = (): void => {
+    navigation.navigate('Signup');
   };
 
   return (
-    <View style={styles.container}>
+    <LinearGradient colors={['#6B7280', '#1F2937']} style={styles.container}>
       <Text style={styles.title}>Log In</Text>
+
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -82,90 +173,118 @@ const Login = ({ navigation }: any) => {
         onChangeText={setPassword}
         secureTextEntry
       />
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Log In</Text>
+
+      <TouchableOpacity
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={handleLogin}
+        disabled={loading}
+        activeOpacity={0.8}>
+        <LinearGradient
+          colors={['#4CAF50', '#45a049']}
+          style={styles.buttonGradient}>
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Log In</Text>
+          )}
+        </LinearGradient>
       </TouchableOpacity>
 
-      {/* Signup navigation link */}
-      <TouchableOpacity onPress={handleNavigateToSignup} style={styles.signupLink}>
+      <TouchableOpacity
+        onPress={handleNavigateToSignup}
+        style={styles.signupLink}>
         <Text style={styles.signupText}>Don't have an account? Sign up</Text>
       </TouchableOpacity>
-      {Platform.OS==='android' &&   <View style={{marginTop: 20}}>
-        <Text
-          style={{
-            color: 'black',
-            fontSize: 16,
-            fontWeight: '600',
-            textAlign: 'center',
-          }}>
-          Or
-        </Text>
 
-        <TouchableOpacity
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 10,
-            backgroundColor: 'white',
-            padding: 5,
-            borderRadius: 5,
-            marginTop:10
-          }}>
-          <Text style={{color: 'black', fontSize: 16, fontWeight: '600'}}>
-            Login with
-          </Text>
-          <Image source={Images.google} style={{height: 20, width: 20}} />
-        </TouchableOpacity>
-      </View>}
-    </View>
+      <Text style={styles.orText}>Or</Text>
+
+      <TouchableOpacity
+        style={[
+          styles.googleButton,
+          loading && styles.buttonDisabled,
+          Platform.OS === 'android'
+            ? styles.googleButtonAndroid
+            : styles.googleButtonIOS,
+        ]}
+        onPress={handleGoogle}
+        disabled={loading}
+        activeOpacity={0.8}>
+        <LinearGradient
+          colors={['#ffffff', '#f1f1f1']}
+          style={styles.googleButtonGradient}>
+          {loading ? (
+            <ActivityIndicator size="small" color="#000" />
+          ) : (
+            <>
+              <Image source={Images.google} style={styles.googleIcon} />
+              <Text style={styles.googleButtonText}>Sign in with Google</Text>
+            </>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
+    </LinearGradient>
   );
 };
 
 export default Login;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E5E4E2',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#333',
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 30,
+    color: '#fff',
   },
   input: {
-    backgroundColor:'white',
+    backgroundColor: '#fff',
     width: '100%',
     height: 50,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    paddingHorizontal: 10,
+    borderRadius: 10,
+    paddingHorizontal: 15,
     marginVertical: 10,
     fontSize: 16,
     color: '#000',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 2},
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   button: {
     width: '100%',
     height: 50,
-    backgroundColor: '#4CAF50',
+    borderRadius: 10,
+    marginTop: 20,
+    overflow: 'hidden',
+  },
+  buttonGradient: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 5,
-    marginTop: 20,
   },
   buttonText: {
     color: '#fff',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   errorText: {
-    color: 'red',
-    marginBottom: 10,
+    color: '#ff4444',
+    marginBottom: 15,
+    fontSize: 14,
   },
   signupLink: {
     marginTop: 20,
@@ -174,5 +293,43 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontSize: 16,
     fontWeight: '600',
+  },
+  orText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  googleButton: {
+    width: '100%',
+    height: 50,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  googleButtonAndroid: {
+    elevation: 3,
+  },
+  googleButtonIOS: {
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  googleButtonGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  googleButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  googleIcon: {
+    height: 24,
+    width: 24,
   },
 });
